@@ -1,6 +1,7 @@
 # exchange-sort
 #include<stdio.h>
 #include<stdlib.h>
+
 int main(){
 	int n=100;
 	int array[100];
