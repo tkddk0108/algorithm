@@ -1,0 +1,293 @@
+#include <bits/stdc++.h>
+using namespace std;
+class BTreeNode {
+  int *keys;
+  int t;
+  BTreeNode **C;
+  int n;
+  bool leaf;
+   public:
+  BTreeNode(int _t, bool _leaf);
+  void traverse();
+  int searchkey(int k);
+  void insert_Non_Full(int k);
+  void split_Child(int i, BTreeNode *y);
+  void deletion(int k);
+  void remove_From_Leaf(int idx);
+  void remove_From_Non_Leaf(int idx);
+  int get_Predecessor(int idx);
+  int get_Successor(int idx);
+  void fill(int idx);
+  void borrow_From_Prev(int idx);
+  void borrow_From_Next(int idx);
+  void merge(int idx);
+  friend class BTree;
+};
+class BTree {
+  BTreeNode *root;
+  int t; 
+   public:
+  BTree(int _t) {
+    root = NULL;
+    t = _t;
+  } 
+  void traverse() {
+    if (root != NULL)
+      root->traverse();
+  } 
+  void insertion(int k);
+  void deletion(int k);
+};
+// B-tree node 값 
+BTreeNode::BTreeNode(int t1, bool leaf1) {
+  t = t1;
+  leaf = leaf1; 
+  keys = new int[2 * t - 1];
+  C = new BTreeNode *[2 * t];
+  n = 0;
+} 
+// key 찾기 
+int BTreeNode::searchkey(int k) {
+  int idx = 0;
+  while (idx < n && keys[idx] < k)
+    ++idx;
+  return idx;
+}
+// deletion operation 
+void BTreeNode::deletion(int k) {
+  int idx = searchkey(k);
+  if (idx < n && keys[idx] == k) {
+    if (leaf)
+      remove_From_Leaf(idx);
+    else
+      remove_From_Non_Leaf(idx);
+  } else {
+    bool flag = ((idx == n) ? true : false);
+    if (C[idx]->n < t)
+      fill(idx);
+    if (flag && idx > n)
+      C[idx - 1]->deletion(k);
+    else
+      C[idx]->deletion(k);
+  }
+  return;
+} 
+// leaf에서 제거하기  
+void BTreeNode::remove_From_Leaf(int idx) {
+  for (int i = idx + 1; i < n; ++i)
+    keys[i - 1] = keys[i];
+  n--;
+  return;
+} 
+// leaf가 아닌 노드에서 제거히기 
+void BTreeNode::remove_From_Non_Leaf(int idx) {
+  int k = keys[idx]; 
+  if (C[idx]->n >= t) {
+    int pred = get_Predecessor(idx);
+    keys[idx] = pred;
+    C[idx]->deletion(pred);
+  } 
+  else if (C[idx + 1]->n >= t) {
+    int succ = get_Successor(idx);
+    keys[idx] = succ;
+    C[idx + 1]->deletion(succ);
+  } 
+  else {
+    merge(idx);
+    C[idx]->deletion(k);
+  }
+  return;
+} 
+int BTreeNode::get_Predecessor(int idx) {
+  BTreeNode *cur = C[idx];
+  while (!cur->leaf)
+    cur = cur->C[cur->n];
+  return cur->keys[cur->n - 1];
+}
+int BTreeNode::get_Successor(int idx) {
+  BTreeNode *cur = C[idx + 1];
+  while (!cur->leaf)
+    cur = cur->C[0];
+  return cur->keys[0];
+}
+void BTreeNode::fill(int idx) {
+  if (idx != 0 && C[idx - 1]->n >= t)
+    borrow_From_Prev(idx);
+  else if (idx != n && C[idx + 1]->n >= t)
+    borrow_From_Next(idx);
+  else {
+    if (idx != n)
+      merge(idx);
+    else
+      merge(idx - 1);
+  }
+  return;
+}
+// 이전 값으로부터 가져오기  
+void BTreeNode::borrow_From_Prev(int idx) {
+  BTreeNode *child = C[idx];
+  BTreeNode *sibling = C[idx - 1];
+  for (int i = child->n - 1; i >= 0; --i)
+    child->keys[i + 1] = child->keys[i];
+  if (!child->leaf) {
+    for (int i = child->n; i >= 0; --i)
+      child->C[i + 1] = child->C[i];
+  }
+  child->keys[0] = keys[idx - 1];
+  if (!child->leaf)
+    child->C[0] = sibling->C[sibling->n]; 
+  keys[idx - 1] = sibling->keys[sibling->n - 1];
+  child->n += 1;
+  sibling->n -= 1;
+  return;
+}
+// 다음 값으로부터 가져오기 
+void BTreeNode::borrow_From_Next(int idx) {
+  BTreeNode *child = C[idx];
+  BTreeNode *sibling = C[idx + 1];
+  child->keys[(child->n)] = keys[idx];
+  if (!(child->leaf))
+    child->C[(child->n) + 1] = sibling->C[0];
+  keys[idx] = sibling->keys[0];
+  for (int i = 1; i < sibling->n; ++i)
+    sibling->keys[i - 1] = sibling->keys[i];
+  if (!sibling->leaf) {
+    for (int i = 1; i <= sibling->n; ++i)
+      sibling->C[i - 1] = sibling->C[i];
+  }
+  child->n += 1;
+  sibling->n -= 1;
+  return;
+}
+// Merge 합병 
+void BTreeNode::merge(int idx) {
+  BTreeNode *child = C[idx];
+  BTreeNode *sibling = C[idx + 1];
+  child->keys[t - 1] = keys[idx];
+  for (int i = 0; i < sibling->n; ++i)
+    child->keys[i + t] = sibling->keys[i];
+  if (!child->leaf) {
+    for (int i = 0; i <= sibling->n; ++i)
+      child->C[i + t] = sibling->C[i];
+  } 
+  for (int i = idx + 1; i < n; ++i)
+    keys[i - 1] = keys[i];
+  for (int i = idx + 2; i <= n; ++i)
+    C[i - 1] = C[i]; 
+  child->n += sibling->n + 1;
+  n--;
+  delete (sibling);
+  return;
+} 
+// Insertion operation
+void BTree::insertion(int k) {
+  if (root == NULL) {
+    root = new BTreeNode(t, true);
+    root->keys[0] = k;
+    root->n = 1;
+  } else {
+    if (root->n == 2 * t - 1) {
+      BTreeNode *s = new BTreeNode(t, false);
+      s->C[0] = root;
+      s->split_Child(0, root);
+      int i = 0;
+      if (s->keys[0] < k)
+        i++;
+      s->C[i]->insert_Non_Full(k);
+      root = s;
+    } else
+      root->insert_Non_Full(k);
+  }
+}
+// full이 아닐 때 insertion 
+void BTreeNode::insert_Non_Full(int k) {
+  int i = n - 1;
+  if (leaf == true) {
+    while (i >= 0 && keys[i] > k) {
+      keys[i + 1] = keys[i];
+      i--;
+    }
+    keys[i + 1] = k;
+    n = n + 1;
+  } else {
+    while (i >= 0 && keys[i] > k)
+      i--;
+    if (C[i + 1]->n == 2 * t - 1) {
+      split_Child(i + 1, C[i + 1]);
+
+ 
+      if (keys[i + 1] < k)
+        i++;
+    }
+    C[i + 1]->insert_Non_Full(k);
+  }
+} 
+// 자식과 분리시키기 (split child)
+void BTreeNode::split_Child(int i, BTreeNode *y) {
+  BTreeNode *z = new BTreeNode(y->t, y->leaf);
+  z->n = t - 1;
+  for (int j = 0; j < t - 1; j++)
+    z->keys[j] = y->keys[j + t];
+  if (y->leaf == false) {
+    for (int j = 0; j < t; j++)
+      z->C[j] = y->C[j + t];
+  }
+  y->n = t - 1;
+  for (int j = n; j >= i + 1; j--)
+    C[j + 1] = C[j];
+  C[i + 1] = z;
+  for (int j = n - 1; j >= i; j--)
+    keys[j + 1] = keys[j];
+  keys[i] = y->keys[t - 1];
+  n = n + 1;
+}
+// Traverse
+void BTreeNode::traverse() {
+  int i;
+  for (i = 0; i < n; i++) {
+    if (leaf == false)
+      C[i]->traverse();
+    cout << " " << keys[i];
+  }
+  if (leaf == false)
+    C[i]->traverse();
+}
+// Delete Operation
+void BTree::deletion(int k) {
+  if (!root) {
+    cout << "The tree is empty\n";
+    return;
+  }
+  root->deletion(k);
+  if (root->n == 0) {
+    BTreeNode *tmp = root;
+    if (root->leaf)
+      root = NULL;
+    else
+      root = root->C[0]; 
+    delete tmp;
+  }
+  return;
+} 
+//메인함수 시작 
+int main() {
+  BTree bt(9); //b-tree의 차수를 설정할 수 있도록 하였음 
+  int key;
+  int x[1000]; //b-tree에 삽입할 1000개의 값을 랜덤으로 발생시키고 저장할 공간 
+  srand(time(NULL)); //매번 다른 값을 생성할 수 있도록 함  
+  for (int i=0; i<1000; i++){	//1000개의 값을 만들도록함  
+  	x[i]=rand()%10000;	//0-9999까지의 값 중에서 랜덤 난수 발생 
+  	bt.insertion(x[i]);	//생성된 수는 x에 저장 
+  }
+
+  cout << "The B-tree is: "<<endl; //1000개의 값이 입력된 b-tree값 출력 
+  bt.traverse();
+
+  for (int i=0; i<500; i++){
+  	bt.deletion(x[i]); //앞에서부터 500개 삭제시킴 
+  }
+  
+  cout << "\n\nThe B-tree after deletion 500 key is: "<<endl;
+  bt.traverse(); //삭제된 b-tree값 출력 
+
+}
